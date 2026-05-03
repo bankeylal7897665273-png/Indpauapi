@@ -1,126 +1,260 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Business Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VaultPay Business VIP</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { background: #fdfdfd; color: #333; font-family: 'Segoe UI', sans-serif; margin: 0; }
-        .card { background: #fff; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eee; }
-        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 10px; background: #fafafa; box-sizing: border-box; }
-        button { width: 100%; padding: 15px; background: #007bff; color: #fff; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #0056b3; }
-        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #007bff; border-radius: 50%; width: 25px; height: 25px; animation: spin 1s linear infinite; display: none; margin: 10px auto; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; font-weight: bold;}
+        body { background-color: #0f172a; color: #fff; overflow-x: hidden; }
+        
+        .glass { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 18px; }
+        .neon-text { color: #10b981; text-shadow: 0 0 15px rgba(16, 185, 129, 0.6); }
+        
+        #notifications { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .notification { margin-bottom: 15px; padding: 18px 25px; border-radius: 12px; border: 1px solid; animation: slideIn 0.3s ease-out; background: #1e293b; color: #fff;}
+        .notification.success { border-color: #10b981; border-left: 5px solid #10b981; }
+        .notification.error { border-color: #ef4444; border-left: 5px solid #ef4444; }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        
+        button { width: 100%; padding: 16px; background: #10b981; color: #fff; border: none; border-radius: 12px; font-size: 18px; cursor: pointer; transition: 0.3s; position: relative; }
+        button:hover { background: #059669; box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); }
+        button:disabled { background: #475569; }
+        
+        .loader { border: 4px solid transparent; border-top: 4px solid #fff; border-radius: 50%; width: 26px; height: 26px; animation: spin 1s linear infinite; display: none; margin: 0 auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #app-page { display: none; padding: 20px; margin-top: 60px; }
-        .header { background: #fff; padding: 15px; position: fixed; top: 0; width: 100%; box-shadow: 0 2px 5px rgba(0,0,0,0.03); z-index: 100; display: flex; justify-content: space-between; }
-        .sidebar { position: fixed; left: -280px; top: 0; width: 260px; height: 100%; background: #fff; z-index: 200; transition: 0.3s; box-shadow: 2px 0 10px rgba(0,0,0,0.05); padding-top: 60px; }
-        .sidebar.open { left: 0; }
-        .sidebar a { display: block; padding: 15px 25px; color: #444; text-decoration: none; font-weight: 600; border-bottom: 1px solid #f9f9f9; }
+        .btn-text.hidden { display: none; }
+        .loader.active { display: block; }
+        
+        input { width: 100%; padding: 16px; background: #1e293b; border: 2px solid #334155; color: #fff; border-radius: 12px; margin-bottom: 20px; outline: none; transition: 0.3s;}
+        input:focus { border-color: #10b981; }
+
+        /* Auth Page */
+        #auth-page { display: flex; justify-content: center; align-items: center; min-height: 100vh; width: 100%; position: absolute; z-index: 5000; background: #0f172a;}
+        .auth-container { width: 100%; max-width: 420px; padding: 40px; text-align: center; }
+
+        /* Dashboard Page */
+        #app-page { display: none; padding: 20px; min-height: 100vh; }
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 15px 25px; background: #1e293b; position: fixed; top: 0; left: 0; width: 100%; z-index: 999; border-bottom: 2px solid #334155;}
+        .sidebar { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: #1e293b; transition: 0.3s; z-index: 1000; padding-top: 80px; border-right: 2px solid #334155;}
+        .sidebar.open { left: 0; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+        .sidebar a { display: block; padding: 18px 25px; color: #cbd5e1; text-decoration: none; border-bottom: 1px solid #334155; font-size: 17px; }
+        .sidebar a:hover, .sidebar a.active { background: rgba(16, 185, 129, 0.1); color: #10b981; border-left: 5px solid #10b981; }
+        
+        .tab-content { display: none; padding-top: 80px; }
+        .tab-content.active { display: block; }
+        
+        .grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 25px; }
+        .card { padding: 25px; text-align: center; border: 2px solid #334155; border-radius: 15px;}
+        .setup-box { background: #0f172a; padding: 25px; border-radius: 12px; font-family: monospace; color: #10b981; border: 1px solid #334155; }
     </style>
 </head>
 <body>
-    <script src="/static/security.js"></script>
 
-    <div id="auth-page" style="display:flex; justify-content:center; align-items:center; height:100vh;">
-        <div class="card" style="width:320px; text-align:center;">
-            <h2 style="color:#007bff;">VaultPay Business</h2>
-            <input type="email" id="l-email" placeholder="Email">
-            <input type="password" id="l-pass" placeholder="Password">
-            <button onclick="login()" id="l-btn">Login</button>
-            <div class="loader" id="l-load"></div>
-            <p onclick="register()" style="color:#007bff; font-size:13px; cursor:pointer; margin-top:10px;">Create Account</p>
+    <div id="notifications"></div>
+
+    <div id="auth-page">
+        <div class="auth-container glass">
+            <h2 class="neon-text" style="font-size: 30px; margin-bottom: 30px;">VaultPay VIP</h2>
+            <div id="login-form">
+                <input type="email" id="log-email" placeholder="Email ID">
+                <input type="password" id="log-pass" placeholder="Password">
+                <button onclick="login()" id="btn-login"><span class="btn-text">Login <i class="fas fa-sign-in-alt"></i></span><div class="loader" id="load-login"></div></button>
+                <p style="margin-top: 20px; color: #10b981; cursor: pointer;" onclick="toggleAuth('signup')">Create new account</p>
+            </div>
+            <div id="signup-form" style="display: none;">
+                <input type="email" id="reg-email" placeholder="Email ID">
+                <input type="password" id="reg-pass" placeholder="Password (Min 6)">
+                <button onclick="register()" id="btn-reg"><span class="btn-text">Sign Up <i class="fas fa-user-plus"></i></span><div class="loader" id="load-reg"></div></button>
+                <p style="margin-top: 20px; color: #10b981; cursor: pointer;" onclick="toggleAuth('login')">Back to Login</p>
+            </div>
         </div>
     </div>
 
     <div id="app-page">
         <div class="header">
-            <i class="fas fa-bars" onclick="document.getElementById('sidebar').classList.toggle('open')" style="font-size:20px; cursor:pointer;"></i>
-            <b style="color:#007bff;">Dashboard</b>
-            <div></div>
+            <i class="fas fa-bars" style="font-size: 26px; cursor:pointer;" onclick="document.getElementById('sidebar').classList.toggle('open')"></i>
+            <h3 class="neon-text">Dashboard</h3>
+            <i class="fas fa-wallet" style="font-size: 24px; color: #cbd5e1;"></i>
         </div>
+
         <div class="sidebar" id="sidebar">
-            <a href="#" onclick="switchTab('dash')">Home Stats</a>
-            <a href="#" onclick="switchTab('api')">Business API</a>
-            <a href="#" onclick="switchTab('vip')">VIP Upgrade</a>
-            <a href="#" onclick="auth.signOut()">Logout</a>
+            <i class="fas fa-times" style="position: absolute; top: 20px; right: 25px; font-size: 26px; cursor:pointer;" onclick="document.getElementById('sidebar').classList.remove('open')"></i>
+            <a href="#" onclick="switchTab('dash-tab')">📊 Home Stats</a>
+            <a href="#" onclick="switchTab('api-tab')">🔌 Create Business API</a>
+            <a href="#" onclick="switchTab('prompt-tab')">🤖 Master Prompt</a>
+            <a href="#" onclick="logout()" style="color: #ef4444; margin-top: 30px;">🔴 Logout</a>
         </div>
 
-        <div id="dash" class="tab-content active">
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
-                <div class="card" style="text-align:center;"><h5>Success</h5><h2 id="s-amt" style="color:#28a745;">₹0</h2></div>
-                <div class="card" style="text-align:center;"><h5>Rejected</h5><h2 id="r-amt" style="color:#dc3545;">₹0</h2></div>
+        <div id="dash-tab" class="tab-content active">
+            <h2>Your Dashboard</h2>
+            <div class="grid-cards">
+                <div class="card glass" style="border-color: #3b82f6;">
+                    <h3 style="color: #94a3b8;">Plan Status</h3>
+                    <h2 id="stat-vip" style="color: #3b82f6;">FREE</h2>
+                    <p id="stat-apis" style="color: #cbd5e1; margin-top: 10px;">APIs: 0/5</p>
+                    <p style="font-size: 12px; color:#ef4444; margin-top:5px; cursor:pointer;" onclick="alert('Contact Admin to buy VIP for 10 APIs')">Buy VIP for new API create</p>
+                </div>
+                <div class="card glass" style="border-color: #10b981;">
+                    <h3 style="color: #10b981;">Total Success</h3>
+                    <h2 id="stat-s-amt" style="color: #10b981; font-size: 32px;">₹0</h2>
+                    <p id="stat-s-cnt" style="color: #10b981; margin-top: 10px;">0 Requests</p>
+                </div>
+                <div class="card glass" style="border-color: #ef4444;">
+                    <h3 style="color: #ef4444;">Total Rejected</h3>
+                    <h2 id="stat-r-amt" style="color: #ef4444; font-size: 32px;">₹0</h2>
+                    <p id="stat-r-cnt" style="color: #ef4444; margin-top: 10px;">0 Requests</p>
+                </div>
             </div>
         </div>
 
-        <div id="api" class="tab-content" style="display:none;">
-            <div class="card">
-                <h3>Setup Business API</h3>
-                <p style="font-size:12px; color:#666;">Support for PhonePe/GPay Business</p>
-                <input type="text" id="api-un" placeholder="Username (e.g. rohit_store)">
-                <input type="text" id="api-upi" placeholder="Business UPI ID">
-                <input type="number" id="api-mob" placeholder="Business Mobile Number">
-                <button onclick="createAPI()">Generate API</button>
+        <div id="api-tab" class="tab-content">
+            <h2>Create API</h2>
+            <div class="glass" style="padding: 25px; margin-top: 20px;">
+                <p style="color:#10b981; margin-bottom: 20px;">Support for: PhonePe Business, GPay Business, Paytm Business</p>
+                <input type="text" id="api-un" placeholder="Custom Username (e.g. rohit123)">
+                <input type="number" id="api-mob" placeholder="Business Phone Number">
+                <input type="text" id="api-upi" placeholder="Business UPI ID (Must)">
+                <button onclick="createAPI()" id="btn-api"><span class="btn-text">Create API</span><div class="loader" id="load-api"></div></button>
             </div>
-            <div id="api-list"></div>
+            <h3 style="margin-top: 30px;">Your APIs</h3>
+            <div id="my-apis" style="margin-top: 15px;"></div>
         </div>
 
-        <div id="vip" class="tab-content" style="display:none;">
-            <div class="card" style="background:#007bff; color:#fff; text-align:center;">
-                <h2>Upgrade VIP</h2>
-                <p>₹20 for Lifetime + 10 API Slots</p>
-                <input type="text" id="vip-utr" placeholder="Enter Payment UTR" style="background:#fff; color:#333;">
-                <button style="background:#fff; color:#007bff;" onclick="requestVIP()">Submit Request</button>
+        <div id="prompt-tab" class="tab-content">
+            <h2>Master AI Prompt</h2>
+            <div class="setup-box" id="p-box">
+I need to integrate a payment gateway. Do not shorten any code.
+Flow:
+1. User enters amount. Show 5s loading.
+2. Background GET request to: `https://[YOUR_VERCEL_URL]/[API_USERNAME]/id.html/[AMOUNT]`
+3. Extract `payment_url` from JSON response.
+4. Redirect user to that `payment_url`.
+5. The gateway has NO UTR box, it auto-verifies via backend. Wait for it to success. 
+Write the full app integration code.
             </div>
+            <button style="margin-top:20px; background:#3b82f6;" onclick="navigator.clipboard.writeText(document.getElementById('p-box').innerText); showPop('Copied!', 'success');">Copy Prompt</button>
         </div>
     </div>
 
     <script>
-        function switchTab(t) {
-            document.querySelectorAll('.tab-content').forEach(x => x.style.display='none');
-            document.getElementById(t).style.display='block';
-            document.getElementById('sidebar').classList.remove('open');
+        const firebaseConfig = {
+            apiKey: "AIzaSyASlD4FM6lyIEzBAzPlflhlCwDc3Toh6Fo",
+            authDomain: "earning-a9b0c.firebaseapp.com",
+            databaseURL: "https://earning-a9b0c-default-rtdb.firebaseio.com",
+            projectId: "earning-a9b0c"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth(); const db = firebase.database(); const DB_ROOT = 'VaultPay_Business';
+        let currentUser = null;
+
+        function showPop(m, t) {
+            const b = document.getElementById('notifications');
+            const n = document.createElement('div'); n.className = `notification ${t}`; n.innerHTML = m;
+            b.appendChild(n); setTimeout(() => n.remove(), 3500);
         }
-        auth.onAuthStateChanged(user => {
+
+        function toggleAuth(t) {
+            document.getElementById('login-form').style.display = t === 'login' ? 'block' : 'none';
+            document.getElementById('signup-form').style.display = t === 'signup' ? 'block' : 'none';
+        }
+
+        function switchTab(t) {
+            document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+            document.getElementById(t).classList.add('active');
+            document.getElementById('sidebar').classList.remove('open');
+            if(t === 'dash-tab') loadStats();
+            if(t === 'api-tab') loadMyAPIs();
+        }
+
+        function btnLoad(id, s) {
+            const b = document.getElementById(id);
+            if(s) { b.disabled=true; b.querySelector('.btn-text').classList.add('hidden'); b.querySelector('.loader').classList.add('active'); }
+            else { b.disabled=false; b.querySelector('.btn-text').classList.remove('hidden'); b.querySelector('.loader').classList.remove('active'); }
+        }
+
+        auth.onAuthStateChanged(async user => {
             if(user) {
-                document.getElementById('auth-page').style.display='none';
-                document.getElementById('app-page').style.display='block';
-                loadData(user.uid);
+                currentUser = user;
+                const p = await db.ref(`${DB_ROOT}/users/${user.uid}`).once('value');
+                if(!p.exists()){ await db.ref(`${DB_ROOT}/users/${user.uid}`).set({email: user.email, is_vip: false, allowed_api: 5, api_count: 0}); }
+                document.getElementById('auth-page').style.display = 'none';
+                document.getElementById('app-page').style.display = 'block';
+                showPop('Welcome to Website!', 'success');
+                switchTab('dash-tab'); 
             } else {
-                document.getElementById('auth-page').style.display='flex';
-                document.getElementById('app-page').style.display='none';
+                currentUser = null;
+                document.getElementById('auth-page').style.display = 'flex';
+                document.getElementById('app-page').style.display = 'none';
             }
         });
-        async function login() {
-            document.getElementById('l-load').style.display='block';
-            try { await auth.signInWithEmailAndPassword(document.getElementById('l-email').value, document.getElementById('l-pass').value); }
-            catch(err) { alert("Invalid!"); }
-            document.getElementById('l-load').style.display='none';
-        }
+
         async function register() {
-            try { await auth.createUserWithEmailAndPassword(document.getElementById('l-email').value, document.getElementById('l-pass').value); }
-            catch(err) { alert(err.message); }
+            const e = document.getElementById('reg-email').value, p = document.getElementById('reg-pass').value;
+            btnLoad('btn-reg', true);
+            try { await auth.createUserWithEmailAndPassword(e, p); showPop("Account Create Successful!", 'success'); } 
+            catch(err) { showPop(err.message, 'error'); }
+            btnLoad('btn-reg', false);
         }
-        async function createAPI() {
-            const un = document.getElementById('api-un').value, upi = document.getElementById('api-upi').value;
-            const mob = document.getElementById('api-mob').value;
-            if(!un || !upi) return alert("Fill all!");
-            await db.ref(`${DB_ROOT}/apis/${un}`).set({uid: auth.currentUser.uid, upi_id: upi, mobile: mob, status:'active'});
-            alert("API Created!");
+
+        async function login() {
+            const e = document.getElementById('log-email').value, p = document.getElementById('log-pass').value;
+            btnLoad('btn-login', true);
+            try { await auth.signInWithEmailAndPassword(e, p); } 
+            catch(err) { showPop("Wrong Details", 'error'); }
+            btnLoad('btn-login', false);
         }
-        function loadData(uid) {
-            db.ref(`${DB_ROOT}/users/${uid}/stats`).on('value', s => {
-                const d = s.val() || {s_amt:0, r_amt:0};
-                document.getElementById('s-amt').innerText = '₹' + d.s_amt;
-                document.getElementById('r-amt').innerText = '₹' + d.r_amt;
+        function logout() { auth.signOut(); }
+
+        function loadStats() {
+            if(!currentUser) return;
+            db.ref(`${DB_ROOT}/users/${currentUser.uid}`).on('value', s => {
+                const p = s.val(); const vip = p.is_vip;
+                document.getElementById('stat-vip').innerText = vip ? 'VIP' : 'FREE';
+                document.getElementById('stat-apis').innerText = `APIs: ${p.api_count || 0}/${vip ? 10 : 5}`;
+                
+                const stats = p.stats || {s_amt:0, r_amt:0, s_count:0, r_count:0};
+                document.getElementById('stat-s-amt').innerText = `₹${stats.s_amt}`;
+                document.getElementById('stat-s-cnt').innerText = `${stats.s_count} Success`;
+                document.getElementById('stat-r-amt').innerText = `₹${stats.r_amt}`;
+                document.getElementById('stat-r-cnt').innerText = `${stats.r_count} Rejected`;
             });
-            db.ref(`${DB_ROOT}/apis`).orderByChild('uid').equalTo(uid).on('value', s => {
-                const list = document.getElementById('api-list'); list.innerHTML = '';
+        }
+
+        async function createAPI() {
+            const un = document.getElementById('api-un').value.trim();
+            const mob = document.getElementById('api-mob').value.trim();
+            const upi = document.getElementById('api-upi').value.trim();
+            if(!un || !mob || !upi) return showPop("Fill all boxes!", 'error');
+
+            btnLoad('btn-api', true);
+            const userRef = db.ref(`${DB_ROOT}/users/${currentUser.uid}`);
+            const prof = (await userRef.once('value')).val();
+            if(prof.api_count >= (prof.is_vip ? 10 : 5)) { btnLoad('btn-api', false); return showPop("API Limit Over! Buy VIP.", 'error'); }
+
+            const check = await db.ref(`${DB_ROOT}/apis/${un}`).once('value');
+            if(check.exists()) { btnLoad('btn-api', false); return showPop("Username Taken!", 'error'); }
+
+            await db.ref(`${DB_ROOT}/apis/${un}`).set({ uid: currentUser.uid, mobile: mob, upi_id: upi, status: 'active' });
+            await userRef.update({api_count: prof.api_count + 1});
+            btnLoad('btn-api', false); loadMyAPIs(); showPop('API Created!', 'success');
+        }
+
+        function loadMyAPIs() {
+            if(!currentUser) return;
+            const BASE = window.location.origin;
+            db.ref(`${DB_ROOT}/apis`).orderByChild('uid').equalTo(currentUser.uid).on('value', s => {
+                const box = document.getElementById('my-apis'); box.innerHTML = '';
                 s.forEach(c => {
-                    list.innerHTML += `<div class="card"><b>ID: ${c.key}</b><br><small>${window.location.origin}/${c.key}/id.html/[AMT]</small></div>`;
+                    box.innerHTML += `
+                        <div class="glass" style="padding:20px; margin-bottom:15px; border-color:#10b981;">
+                            <h3 style="color:#10b981;">ID: ${c.key}</h3>
+                            <p style="font-family:monospace; font-size:12px; color:#3b82f6; margin-top:10px; word-break:break-all;">${BASE}/${c.key}/id.html/[AMOUNT]</p>
+                        </div>`;
                 });
             });
         }
