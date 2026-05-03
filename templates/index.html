@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Dashboard</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { background: #fdfdfd; color: #333; font-family: 'Segoe UI', sans-serif; margin: 0; }
+        .card { background: #fff; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eee; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 10px; background: #fafafa; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; background: #007bff; color: #fff; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #0056b3; }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #007bff; border-radius: 50%; width: 25px; height: 25px; animation: spin 1s linear infinite; display: none; margin: 10px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #app-page { display: none; padding: 20px; margin-top: 60px; }
+        .header { background: #fff; padding: 15px; position: fixed; top: 0; width: 100%; box-shadow: 0 2px 5px rgba(0,0,0,0.03); z-index: 100; display: flex; justify-content: space-between; }
+        .sidebar { position: fixed; left: -280px; top: 0; width: 260px; height: 100%; background: #fff; z-index: 200; transition: 0.3s; box-shadow: 2px 0 10px rgba(0,0,0,0.05); padding-top: 60px; }
+        .sidebar.open { left: 0; }
+        .sidebar a { display: block; padding: 15px 25px; color: #444; text-decoration: none; font-weight: 600; border-bottom: 1px solid #f9f9f9; }
+    </style>
+</head>
+<body>
+    <script src="/static/security.js"></script>
+
+    <div id="auth-page" style="display:flex; justify-content:center; align-items:center; height:100vh;">
+        <div class="card" style="width:320px; text-align:center;">
+            <h2 style="color:#007bff;">VaultPay Business</h2>
+            <input type="email" id="l-email" placeholder="Email">
+            <input type="password" id="l-pass" placeholder="Password">
+            <button onclick="login()" id="l-btn">Login</button>
+            <div class="loader" id="l-load"></div>
+            <p onclick="register()" style="color:#007bff; font-size:13px; cursor:pointer; margin-top:10px;">Create Account</p>
+        </div>
+    </div>
+
+    <div id="app-page">
+        <div class="header">
+            <i class="fas fa-bars" onclick="document.getElementById('sidebar').classList.toggle('open')" style="font-size:20px; cursor:pointer;"></i>
+            <b style="color:#007bff;">Dashboard</b>
+            <div></div>
+        </div>
+        <div class="sidebar" id="sidebar">
+            <a href="#" onclick="switchTab('dash')">Home Stats</a>
+            <a href="#" onclick="switchTab('api')">Business API</a>
+            <a href="#" onclick="switchTab('vip')">VIP Upgrade</a>
+            <a href="#" onclick="auth.signOut()">Logout</a>
+        </div>
+
+        <div id="dash" class="tab-content active">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                <div class="card" style="text-align:center;"><h5>Success</h5><h2 id="s-amt" style="color:#28a745;">₹0</h2></div>
+                <div class="card" style="text-align:center;"><h5>Rejected</h5><h2 id="r-amt" style="color:#dc3545;">₹0</h2></div>
+            </div>
+        </div>
+
+        <div id="api" class="tab-content" style="display:none;">
+            <div class="card">
+                <h3>Setup Business API</h3>
+                <p style="font-size:12px; color:#666;">Support for PhonePe/GPay Business</p>
+                <input type="text" id="api-un" placeholder="Username (e.g. rohit_store)">
+                <input type="text" id="api-upi" placeholder="Business UPI ID">
+                <input type="number" id="api-mob" placeholder="Business Mobile Number">
+                <button onclick="createAPI()">Generate API</button>
+            </div>
+            <div id="api-list"></div>
+        </div>
+
+        <div id="vip" class="tab-content" style="display:none;">
+            <div class="card" style="background:#007bff; color:#fff; text-align:center;">
+                <h2>Upgrade VIP</h2>
+                <p>₹20 for Lifetime + 10 API Slots</p>
+                <input type="text" id="vip-utr" placeholder="Enter Payment UTR" style="background:#fff; color:#333;">
+                <button style="background:#fff; color:#007bff;" onclick="requestVIP()">Submit Request</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(t) {
+            document.querySelectorAll('.tab-content').forEach(x => x.style.display='none');
+            document.getElementById(t).style.display='block';
+            document.getElementById('sidebar').classList.remove('open');
+        }
+        auth.onAuthStateChanged(user => {
+            if(user) {
+                document.getElementById('auth-page').style.display='none';
+                document.getElementById('app-page').style.display='block';
+                loadData(user.uid);
+            } else {
+                document.getElementById('auth-page').style.display='flex';
+                document.getElementById('app-page').style.display='none';
+            }
+        });
+        async function login() {
+            document.getElementById('l-load').style.display='block';
+            try { await auth.signInWithEmailAndPassword(document.getElementById('l-email').value, document.getElementById('l-pass').value); }
+            catch(err) { alert("Invalid!"); }
+            document.getElementById('l-load').style.display='none';
+        }
+        async function register() {
+            try { await auth.createUserWithEmailAndPassword(document.getElementById('l-email').value, document.getElementById('l-pass').value); }
+            catch(err) { alert(err.message); }
+        }
+        async function createAPI() {
+            const un = document.getElementById('api-un').value, upi = document.getElementById('api-upi').value;
+            const mob = document.getElementById('api-mob').value;
+            if(!un || !upi) return alert("Fill all!");
+            await db.ref(`${DB_ROOT}/apis/${un}`).set({uid: auth.currentUser.uid, upi_id: upi, mobile: mob, status:'active'});
+            alert("API Created!");
+        }
+        function loadData(uid) {
+            db.ref(`${DB_ROOT}/users/${uid}/stats`).on('value', s => {
+                const d = s.val() || {s_amt:0, r_amt:0};
+                document.getElementById('s-amt').innerText = '₹' + d.s_amt;
+                document.getElementById('r-amt').innerText = '₹' + d.r_amt;
+            });
+            db.ref(`${DB_ROOT}/apis`).orderByChild('uid').equalTo(uid).on('value', s => {
+                const list = document.getElementById('api-list'); list.innerHTML = '';
+                s.forEach(c => {
+                    list.innerHTML += `<div class="card"><b>ID: ${c.key}</b><br><small>${window.location.origin}/${c.key}/id.html/[AMT]</small></div>`;
+                });
+            });
+        }
+    </script>
+</body>
+</html>
