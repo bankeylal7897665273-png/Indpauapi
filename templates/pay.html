@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout</title>
+    <style>
+        body { background:#f8f9fa; font-family:sans-serif; display:flex; justify-content:center; align-items:center; height:100vh; margin:0; }
+        .box { background:#fff; padding:30px; border-radius:20px; width:340px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.05); border:1px solid #eee; }
+        .amt { font-size:40px; font-weight:bold; margin:10px 0; color:#000; }
+        .timer { color:#dc3545; font-weight:bold; background:#fff5f5; padding:5px 15px; border-radius:20px; display:inline-block; }
+        input { width:100%; padding:14px; border:1px solid #ddd; border-radius:10px; text-align:center; box-sizing:border-box; margin:15px 0; font-size:16px; }
+        button { width:100%; padding:15px; background:#007bff; color:#fff; border:none; border-radius:10px; font-weight:bold; cursor:pointer; font-size:16px; }
+    </style>
+</head>
+<body>
+    <div class="box" id="paybox">
+        <div class="timer" id="timer">05:00</div>
+        <div style="margin-top:15px; color:#666; font-size:14px;">Total Payable Amount</div>
+        <div class="amt">₹{{ amt }}</div>
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa={{upi}}&am={{amt}}&cu=INR" style="margin:15px 0;">
+        <input type="number" id="utr" placeholder="Enter 12-Digit UTR">
+        <button onclick="verify()" id="vbtn">Verify Payment</button>
+        <p id="msg" style="display:none; margin-top:15px; font-weight:bold;"></p>
+    </div>
+    <script>
+        let t = 300;
+        let it = setInterval(() => {
+            if(t <= 0) { document.getElementById('paybox').innerHTML="<h2 style='color:red'>Link Expired</h2>"; clearInterval(it); return; }
+            t--;
+            document.getElementById('timer').innerText = Math.floor(t/60).toString().padStart(2,'0') + ":" + (t%60).toString().padStart(2,'0');
+        }, 1000);
+
+        async function verify() {
+            const u = document.getElementById('utr').value;
+            if(u.length < 12) return alert("Invalid UTR");
+            document.getElementById('vbtn').innerText = "Tracking ID...";
+            const res = await fetch('/api/verify', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({user:"{{user}}", tid:"{{tid}}", utr:u, amt:"{{amt}}"})
+            });
+            const d = await res.json();
+            document.getElementById('msg').style.display='block';
+            document.getElementById('msg').innerText = "Sent to Admin Review! ⌛ Tracking by ID...";
+            document.getElementById('msg').style.color = "orange";
+            document.getElementById('vbtn').disabled = true;
+        }
+    </script>
+</body>
+</html>
