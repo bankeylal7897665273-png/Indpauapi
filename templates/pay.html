@@ -2,48 +2,71 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checkout</title>
+    <title>Make Payment</title>
     <style>
-        body { background:#f8f9fa; font-family:sans-serif; display:flex; justify-content:center; align-items:center; height:100vh; margin:0; }
-        .box { background:#fff; padding:30px; border-radius:20px; width:340px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.05); border:1px solid #eee; }
-        .amt { font-size:40px; font-weight:bold; margin:10px 0; color:#000; }
-        .timer { color:#dc3545; font-weight:bold; background:#fff5f5; padding:5px 15px; border-radius:20px; display:inline-block; }
-        input { width:100%; padding:14px; border:1px solid #ddd; border-radius:10px; text-align:center; box-sizing:border-box; margin:15px 0; font-size:16px; }
-        button { width:100%; padding:15px; background:#007bff; color:#fff; border:none; border-radius:10px; font-weight:bold; cursor:pointer; font-size:16px; }
+        body { background:#0f172a; color:#fff; font-family:sans-serif; display:flex; justify-content:center; align-items:center; height:100vh; margin:0;}
+        .box { background:rgba(30,41,59,0.9); padding:30px; border-radius:20px; width:100%; max-width:380px; text-align:center; border:1px solid rgba(255,255,255,0.1); }
+        .amt { font-size:40px; font-weight:bold; color:#10b981; margin:15px 0; }
+        .timer { font-size:35px; color:#ef4444; font-weight:bold; }
+        .qr img { width:200px; height:200px; border-radius:10px; margin-bottom:20px;}
+        .loader { border: 4px solid #334155; border-top: 4px solid #10b981; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .stat-text { color: #cbd5e1; font-weight: bold; font-size: 18px; margin-top: 10px;}
     </style>
 </head>
 <body>
-    <div class="box" id="paybox">
-        <div class="timer" id="timer">05:00</div>
-        <div style="margin-top:15px; color:#666; font-size:14px;">Total Payable Amount</div>
+    <div class="box" id="pbox">
+        <div class="timer" id="t">05:00</div>
+        <div style="color:#94a3b8; font-size:14px; margin-top:10px;">Waiting for payment...</div>
         <div class="amt">₹{{ amt }}</div>
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa={{upi}}&am={{amt}}&cu=INR" style="margin:15px 0;">
-        <input type="number" id="utr" placeholder="Enter 12-Digit UTR">
-        <button onclick="verify()" id="vbtn">Verify Payment</button>
-        <p id="msg" style="display:none; margin-top:15px; font-weight:bold;"></p>
+        <div class="qr">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa={{upi}}&am={{amt}}&cu=INR">
+        </div>
+        
+        <div class="loader" id="ldr"></div>
+        <div class="stat-text" id="msg">Checking Payment Automatically...</div>
     </div>
+
     <script>
-        let t = 300;
-        let it = setInterval(() => {
-            if(t <= 0) { document.getElementById('paybox').innerHTML="<h2 style='color:red'>Link Expired</h2>"; clearInterval(it); return; }
-            t--;
-            document.getElementById('timer').innerText = Math.floor(t/60).toString().padStart(2,'0') + ":" + (t%60).toString().padStart(2,'0');
+        const USER = "{{ user }}";
+        const TID = "{{ tid }}";
+        let time = 300;
+        let isDone = false;
+        
+        // 5 MIN TIMER
+        let timerInt = setInterval(() => {
+            if(isDone) { clearInterval(timerInt); return; }
+            if(time <= 0) { 
+                clearInterval(timerInt); 
+                document.getElementById('pbox').innerHTML = "<h2 style='color:#ef4444; font-size:40px;'>❌ Rejected</h2><p style='color:#94a3b8;'>Time Expired. Payment Not Received.</p>"; 
+                return; 
+            }
+            time--;
+            document.getElementById('t').innerText = Math.floor(time/60).toString().padStart(2,'0') + ":" + (time%60).toString().padStart(2,'0');
         }, 1000);
 
-        async function verify() {
-            const u = document.getElementById('utr').value;
-            if(u.length < 12) return alert("Invalid UTR");
-            document.getElementById('vbtn').innerText = "Tracking ID...";
-            const res = await fetch('/api/verify', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({user:"{{user}}", tid:"{{tid}}", utr:u, amt:"{{amt}}"})
-            });
-            const d = await res.json();
-            document.getElementById('msg').style.display='block';
-            document.getElementById('msg').innerText = "Sent to Admin Review! ⌛ Tracking by ID...";
-            document.getElementById('msg').style.color = "orange";
-            document.getElementById('vbtn').disabled = true;
+        // CONTINUOUS BACKGROUND POLLING (Check if payment arrived)
+        async function checkStatus() {
+            if(isDone || time <= 0) return;
+            try {
+                const res = await fetch('/api/check_status', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({txn_id: TID, user: USER})
+                });
+                const data = await res.json();
+                
+                if(data.status === 'success') {
+                    isDone = true;
+                    document.getElementById('pbox').innerHTML = "<h2 style='color:#10b981; font-size:40px;'>✅ Success</h2><p style='color:#94a3b8;'>Payment Received Successfully!</p>";
+                } else if(data.status === 'rejected') {
+                    isDone = true;
+                    document.getElementById('pbox').innerHTML = "<h2 style='color:#ef4444; font-size:40px;'>❌ Rejected</h2><p style='color:#94a3b8;'>Payment Failed or Timeout.</p>";
+                }
+            } catch(e) {}
         }
+
+        // Har 5 second mein check karega bina kisi button ke
+        setInterval(checkStatus, 5000);
     </script>
 </body>
 </html>
